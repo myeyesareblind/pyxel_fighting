@@ -46,15 +46,27 @@ class EndScene:
         self.winner = winner
     
     def update(self):
+        if pyxel.btn(pyxel.KEY_R):
+            return GameScene()
         return self
 
     def draw(self):
         pyxel.text(SIZE / 2, SIZE / 2, "{} is winner!".format(self.winner.name), pyxel.COLOR_PINK)
+        pyxel.text(SIZE / 2, SIZE / 2 + 10, "press r to restart", pyxel.COLOR_PINK)
 
 class GameScene:
-    players = []
-    bullets = []
-    shot_producers = []
+
+    def __init__(self) -> None:
+        self.players = []
+        self.bullets = []
+        self.shot_producers = []
+
+        k = Kiril()
+        m = Max()
+        self.install_player(k)
+        self.install_player(m)
+        self.install_shot_producer(k.shot_producer)
+        self.install_shot_producer(m.shot_producer)
 
     def install_player(self, player):
         self.players.append(player)
@@ -69,14 +81,12 @@ class GameScene:
         for shot_producer in self.shot_producers:
             bullet = shot_producer.check_bullet()
             if bullet is not None:
-                print("make {}", bullet)
                 self.bullets.append(bullet)
 
         for b in self.bullets:
             b.update()
             hit_player = b.check_hit(self.players)
             if hit_player is not None:
-                print("hit {}", hit_player)
                 self.players.remove(hit_player)
                 return EndScene(self.players[0])
         
@@ -98,14 +108,8 @@ class App:
     def __init__(self):
         pyxel.init(SIZE, SIZE)
         pyxel.load("assets/players.pyxres")
-        k = Kiril()
-        m = Max()
-        self.game_scene = GameScene()
-        self.game_scene.install_player(k)
-        self.game_scene.install_player(m)
-        self.game_scene.install_shot_producer(k.shot_producer)
-        self.game_scene.install_shot_producer(m.shot_producer)
-        self.scene_router = SceneRouter(self.game_scene)
+        game_scene = GameScene()
+        self.scene_router = SceneRouter(game_scene)
         pyxel.run(self.update, self.draw)
 
     def update(self):
@@ -142,9 +146,9 @@ class Bullet:
         pyxel.pset(self.x, self.y, pyxel.COLOR_GREEN)
 
 class ShotProducer:
-    delay = 20
-    last = -1000000
     def __init__(self, player, key, direction) -> None:
+        self.delay = 20
+        self.last = -1000000
         self.player = player
         self.key = key
         self.direction = direction
@@ -178,8 +182,6 @@ class Mover:
             self.target.y = rect.y
 
 class Player:
-    x = 0
-    y = 0
     def __init__(self, x, y, mover) -> None:
         self.x = x
         self.y = y
@@ -195,8 +197,8 @@ class Player:
         pass
 
 class Kiril(Player):
-    name = "Kiril"
     def __init__(self) -> None:
+        self.name = "Kiril"
         self.shot_producer = ShotProducer(self, pyxel.KEY_1, Direction.RIGHT)
         super().__init__(0, SIZE-PLAYER_SIZE, 
                          Mover(self, pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S))
@@ -206,8 +208,8 @@ class Kiril(Player):
         pyxel.blt(self.x, self.y, 0, 0, 0, PLAYER_SIZE, PLAYER_SIZE)
 
 class Max(Player):
-    name = "Max"
     def __init__(self) -> None:
+        self.name = "Max"
         self.shot_producer = ShotProducer(self, pyxel.KEY_0, Direction.LEFT)
         super().__init__(SIZE-PLAYER_SIZE, SIZE-PLAYER_SIZE, 
                         Mover(self, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN))
