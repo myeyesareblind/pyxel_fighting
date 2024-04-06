@@ -61,12 +61,19 @@ class GameScene:
         self.bullets = []
         self.shot_producers = []
 
-        k = Kiril()
-        m = Max()
-        self.install_player(k)
-        self.install_player(m)
-        self.install_shot_producer(k.shot_producer)
-        self.install_shot_producer(m.shot_producer)
+        p1 = Player(0, 0, 
+                    "Kiril",
+                    Mover(pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S, HorizontalDirection.RIGHT), 
+                    PlayerTile(0, 0))
+        p2 = Player(SIZE - PLAYER_SIZE, 0, 
+                    "Max",
+                    Mover(pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT), 
+                    PlayerTile(0, PLAYER_SIZE))
+
+        self.install_player(p1)
+        self.install_player(p2)
+        self.install_shot_producer(ShotProducer(p1, pyxel.KEY_1))
+        self.install_shot_producer(ShotProducer(p2, pyxel.KEY_RETURN))
 
     def install_player(self, player):
         self.players.append(player)
@@ -122,16 +129,41 @@ class App:
 class Direction(Enum):
     LEFT = 1
     RIGHT = 2
+    TOP = 3
+    BOTTOM = 4
+
+class HorizontalDirection(Enum):
+    LEFT = 1
+    RIGHT = 2
 
 class Bullet:
     def __init__(self, player, direction) -> None:
-        self.x = player.x - 1 if direction == Direction.LEFT else player.x + PLAYER_SIZE
-        self.y = player.y + PLAYER_SIZE / 2
+        match direction:
+            case Direction.LEFT:
+                self.x = player.x - 1
+                self.y = player.y + PLAYER_SIZE / 2
+            case Direction.RIGHT:
+                self.x = player.x + PLAYER_SIZE
+                self.y = player.y + PLAYER_SIZE / 2
+            case Direction.TOP:
+                self.x = player.x + PLAYER_SIZE / 2
+                self.y = player.y - 1
+            case Direction.BOTTOM:
+                self.x = player.x + PLAYER_SIZE / 2
+                self.y = player.y + PLAYER_SIZE
         self.direction = direction
         self.player = player
     
     def update(self):
-        self.x += -1 if self.direction == Direction.LEFT else 1
+        match self.direction:
+            case Direction.LEFT:
+                self.x -= 1
+            case Direction.RIGHT:
+                self.x += 1
+            case Direction.TOP:
+                self.y -= 1
+            case Direction.BOTTOM:
+                self.y += 1
     
     def bounds(self):
         return Rect(self.x, self.y, 1, 1)
@@ -146,46 +178,69 @@ class Bullet:
         pyxel.pset(self.x, self.y, pyxel.COLOR_GREEN)
 
 class ShotProducer:
-    def __init__(self, player, key, direction) -> None:
+    def __init__(self, player, key) -> None:
         self.delay = 20
         self.last = -1000000
         self.player = player
         self.key = key
-        self.direction = direction
 
     def check_bullet(self):
         if pyxel.btn(self.key) and pyxel.frame_count - self.last > self.delay:
             self.last = pyxel.frame_count
-            return Bullet(self.player, self.direction)
+            return Bullet(self.player, self.player.mover.direction)
         return None
 
 class Mover:
-    def __init__(self, target, left, right, top, bottom) -> None:
-        self.target = target
+    def __init__(self, left, right, top, bottom, horizontal_direction) -> None:
         self.left = left
         self.right = right
         self.top = top
         self.bottom = bottom
+        self.horizontal_direction = horizontal_direction
+        self.direction = Direction.RIGHT if horizontal_direction == HorizontalDirection.RIGHT else Direction.LEFT
 
     def update(self):
         rect = self.target.bounds()
+        dir = None
         if pyxel.btn(self.left):
+            dir = Direction.LEFT
+            self.horizontal_direction = HorizontalDirection.LEFT
             rect.move(x = -1)
-        if pyxel.btn(self.right) and self.target.y < SIZE - 1:
+        if pyxel.btn(self.right):
+            dir = Direction.RIGHT
+            self.horizontal_direction = HorizontalDirection.RIGHT
             rect.move(x = 1)
-        if pyxel.btn(self.top) and self.target.y > 0:
+        if pyxel.btn(self.top):
+            dir = Direction.TOP
             rect.move(y = -1)
-        if pyxel.btn(self.bottom) and self.target.y < SIZE - 1:
+        if pyxel.btn(self.bottom):
+            dir = Direction.BOTTOM
             rect.move(y = 1)
-        if VIEWPORT.contains(rect):
+        if VIEWPORT.contains(rect) and dir is not None:
+            self.direction = dir
             self.target.x = rect.x
             self.target.y = rect.y
 
-class Player:
-    def __init__(self, x, y, mover) -> None:
+class PlayerTile:
+    def __init__(self, x, y) -> None:
         self.x = x
         self.y = y
+    
+    def draw(self, x, y, horizontal_direction):
+        pyxel.blt(x, y, 
+                  0,
+                  self.x, self.y, 
+                  PLAYER_SIZE if horizontal_direction == HorizontalDirection.RIGHT else -PLAYER_SIZE,
+                  PLAYER_SIZE)
+
+class Player:
+    def __init__(self, x, y, name, mover, tile) -> None:
+        self.x = x
+        self.y = y
+        self.name = name
         self.mover = mover
+        self.mover.target = self
+        self.tile = tile
     
     def bounds(self):
         return Rect(self.x, self.y, PLAYER_SIZE, PLAYER_SIZE)
@@ -194,33 +249,12 @@ class Player:
         self.mover.update()
     
     def draw(self):
-        pass
-
-class Kiril(Player):
-    def __init__(self) -> None:
-        self.name = "Kiril"
-        self.shot_producer = ShotProducer(self, pyxel.KEY_1, Direction.RIGHT)
-        super().__init__(0, SIZE-PLAYER_SIZE, 
-                         Mover(self, pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S))
-
-    def draw(self):
-        super().draw()
-        pyxel.blt(self.x, self.y, 0, 0, 0, PLAYER_SIZE, PLAYER_SIZE)
-
-class Max(Player):
-    def __init__(self) -> None:
-        self.name = "Max"
-        self.shot_producer = ShotProducer(self, pyxel.KEY_0, Direction.LEFT)
-        super().__init__(SIZE-PLAYER_SIZE, SIZE-PLAYER_SIZE, 
-                        Mover(self, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN))
-
-    def draw(self):
-        super().draw()
-        pyxel.blt(self.x, self.y, 0, 0, PLAYER_SIZE, -PLAYER_SIZE, PLAYER_SIZE)
-
+        self.tile.draw(self.x, self.y, self.mover.horizontal_direction)
 
 App()
 
 # TODO:
-# collision detection for bullet
+# refactor player - P1 looks to the wrong side
+# look in different directions
+# shot in different directions
 # draw sword slice
