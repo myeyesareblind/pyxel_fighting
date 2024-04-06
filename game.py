@@ -24,7 +24,34 @@ SIZE = 256
 PLAYER_SIZE = 16
 VIEWPORT = Rect(0, 0, SIZE, SIZE)
 
-class World:
+class Scene:
+    def update(self):
+        return self
+
+    def draw(self):
+        pass
+
+class SceneRouter:
+    def __init__(self, scene) -> None:
+        self.scene = scene
+
+    def update(self):
+        self.scene = self.scene.update()
+    
+    def draw(self):
+        self.scene.draw()
+
+class EndScene:
+    def __init__(self, winner) -> None:
+        self.winner = winner
+    
+    def update(self):
+        return self
+
+    def draw(self):
+        pyxel.text(SIZE / 2, SIZE / 2, "{} is winner!".format(self.winner.name), pyxel.COLOR_PINK)
+
+class GameScene:
     players = []
     bullets = []
     shot_producers = []
@@ -50,11 +77,15 @@ class World:
             hit_player = b.check_hit(self.players)
             if hit_player is not None:
                 print("hit {}", hit_player)
+                self.players.remove(hit_player)
+                return EndScene(self.players[0])
         
         self.bullets = [b for b in self.bullets if VIEWPORT.contains(b.bounds())]
 
         for p in self.players:
             p.update()
+
+        return self
     
     def draw(self):
         for b in self.bullets:
@@ -64,24 +95,25 @@ class World:
             p.draw()
 
 class App:
-    world = World()
     def __init__(self):
         pyxel.init(SIZE, SIZE)
         pyxel.load("assets/players.pyxres")
         k = Kiril()
         m = Max()
-        self.world.install_player(k)
-        self.world.install_player(m)
-        self.world.install_shot_producer(k.shot_producer)
-        self.world.install_shot_producer(m.shot_producer)
+        self.game_scene = GameScene()
+        self.game_scene.install_player(k)
+        self.game_scene.install_player(m)
+        self.game_scene.install_shot_producer(k.shot_producer)
+        self.game_scene.install_shot_producer(m.shot_producer)
+        self.scene_router = SceneRouter(self.game_scene)
         pyxel.run(self.update, self.draw)
 
     def update(self):
-        self.world.update()
+        self.scene_router.update()
 
     def draw(self):
         pyxel.cls(0)
-        self.world.draw()
+        self.scene_router.draw()
 
 class Direction(Enum):
     LEFT = 1
