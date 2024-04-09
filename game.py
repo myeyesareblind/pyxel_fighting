@@ -1,6 +1,9 @@
 import pyxel
 from enum import Enum
 
+SIZE = 256
+PLAYER_SIZE = 16
+
 class Rect:
     def __init__(self, x, y, w, h) -> None:
         self.x = x
@@ -20,9 +23,17 @@ class Rect:
         if y is not None:
             self.y += y
 
-SIZE = 256
-PLAYER_SIZE = 16
 VIEWPORT = Rect(0, 0, SIZE, SIZE)
+
+class Direction(Enum):
+    LEFT = 1
+    RIGHT = 2
+    TOP = 3
+    BOTTOM = 4
+
+class HorizontalDirection(Enum):
+    LEFT = 1
+    RIGHT = 2
 
 class Scene:
     def update(self):
@@ -55,40 +66,42 @@ class EndScene:
         pyxel.text(SIZE / 2, SIZE / 2 + 10, "press r to restart", pyxel.COLOR_PINK)
 
 class GameScene:
-
     def __init__(self) -> None:
         self.players = []
         self.bullets = []
         self.shot_producers = []
+        self.movers = []
+        self.player_painters = []
 
         p1 = Player(0, 0, 
-                    "Kiril",
-                    Mover(pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S, HorizontalDirection.RIGHT), 
-                    PlayerTile(0, 0))
+                    "Kiril")
+
         p2 = Player(SIZE - PLAYER_SIZE, 0, 
-                    "Max",
-                    Mover(pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT), 
-                    PlayerTile(0, PLAYER_SIZE))
+                    "Max")
 
-        self.install_player(p1)
-        self.install_player(p2)
-        self.install_shot_producer(ShotProducer(p1, pyxel.KEY_1))
-        self.install_shot_producer(ShotProducer(p2, pyxel.KEY_RETURN))
+        self.players.append(p1)
+        self.players.append(p2)
+        p1_mover = Mover(p1, pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S, HorizontalDirection.RIGHT)
+        self.movers.append(p1_mover)
+        p2_mover = Mover(p2, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT)
+        self.movers.append(p2_mover)
 
-    def install_player(self, player):
-        self.players.append(player)
+        p1_painter = PlayerPainter(p1, p1_mover, 0, 0)
+        p2_painter = PlayerPainter(p2, p2_mover, 0, PLAYER_SIZE)
+        self.player_painters.append(p1_painter)
+        self.player_painters.append(p2_painter)
 
-    def install_bullet(self, bullet):
-        self.bullets.append(bullet)
+        self.shot_producers.append(ShotProducer(p1, p1_mover, pyxel.KEY_1))
+        self.shot_producers.append(ShotProducer(p2, p2_mover, pyxel.KEY_RETURN))
 
-    def install_shot_producer(self, shot_producer):
-        self.shot_producers.append(shot_producer)
-    
     def update(self):
         for shot_producer in self.shot_producers:
             bullet = shot_producer.check_bullet()
             if bullet is not None:
                 self.bullets.append(bullet)
+
+        for mover in self.movers:
+            mover.update()
 
         for b in self.bullets:
             b.update()
@@ -111,30 +124,8 @@ class GameScene:
         for p in self.players:
             p.draw()
 
-class App:
-    def __init__(self):
-        pyxel.init(SIZE, SIZE)
-        pyxel.load("assets/players.pyxres")
-        game_scene = GameScene()
-        self.scene_router = SceneRouter(game_scene)
-        pyxel.run(self.update, self.draw)
-
-    def update(self):
-        self.scene_router.update()
-
-    def draw(self):
-        pyxel.cls(0)
-        self.scene_router.draw()
-
-class Direction(Enum):
-    LEFT = 1
-    RIGHT = 2
-    TOP = 3
-    BOTTOM = 4
-
-class HorizontalDirection(Enum):
-    LEFT = 1
-    RIGHT = 2
+        for player_painter in self.player_painters:
+            player_painter.draw()
 
 class Bullet:
     def __init__(self, player, direction) -> None:
@@ -178,29 +169,32 @@ class Bullet:
         pyxel.pset(self.x, self.y, pyxel.COLOR_GREEN)
 
 class ShotProducer:
-    def __init__(self, player, key) -> None:
+    def __init__(self, player, mover, key) -> None:
         self.delay = 20
         self.last = -1000000
+        self.mover = mover
         self.player = player
         self.key = key
 
     def check_bullet(self):
         if pyxel.btn(self.key) and pyxel.frame_count - self.last > self.delay:
             self.last = pyxel.frame_count
-            return Bullet(self.player, self.player.mover.direction)
+            return Bullet(self.player, self.mover.direction)
         return None
 
 class Mover:
-    def __init__(self, left, right, top, bottom, horizontal_direction) -> None:
+    def __init__(self, player, left, right, top, bottom, horizontal_direction) -> None:
         self.left = left
         self.right = right
         self.top = top
         self.bottom = bottom
         self.horizontal_direction = horizontal_direction
         self.direction = Direction.RIGHT if horizontal_direction == HorizontalDirection.RIGHT else Direction.LEFT
+        self.player = player
+        self.player.looking_horizontal_dir = horizontal_direction
 
     def update(self):
-        rect = self.target.bounds()
+        rect = self.player.bounds()
         dir = None
         if pyxel.btn(self.left):
             dir = Direction.LEFT
@@ -218,43 +212,55 @@ class Mover:
             rect.move(y = 1)
         if VIEWPORT.contains(rect) and dir is not None:
             self.direction = dir
-            self.target.x = rect.x
-            self.target.y = rect.y
+            self.player.x = rect.x
+            self.player.y = rect.y
 
-class PlayerTile:
-    def __init__(self, x, y) -> None:
+class PlayerPainter:
+    def __init__(self, player, mover, x, y) -> None:
         self.x = x
         self.y = y
+        self.player = player
+        self.mover = mover
     
-    def draw(self, x, y, horizontal_direction):
-        pyxel.blt(x, y, 
+    def draw(self):
+        pyxel.blt(self.player.x, self.player.y, 
                   0,
                   self.x, self.y, 
-                  PLAYER_SIZE if horizontal_direction == HorizontalDirection.RIGHT else -PLAYER_SIZE,
+                  PLAYER_SIZE if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -PLAYER_SIZE,
                   PLAYER_SIZE)
 
 class Player:
-    def __init__(self, x, y, name, mover, tile) -> None:
+    def __init__(self, x, y, name) -> None:
         self.x = x
         self.y = y
         self.name = name
-        self.mover = mover
-        self.mover.target = self
-        self.tile = tile
     
     def bounds(self):
         return Rect(self.x, self.y, PLAYER_SIZE, PLAYER_SIZE)
     
     def update(self):
-        self.mover.update()
+        pass
     
     def draw(self):
-        self.tile.draw(self.x, self.y, self.mover.horizontal_direction)
+        pass
+
+class App:
+    def __init__(self):
+        pyxel.init(SIZE, SIZE)
+        pyxel.load("assets/players.pyxres")
+        game_scene = GameScene()
+        self.scene_router = SceneRouter(game_scene)
+        pyxel.run(self.update, self.draw)
+
+    def update(self):
+        self.scene_router.update()
+
+    def draw(self):
+        pyxel.cls(0)
+        self.scene_router.draw()
 
 App()
 
 # TODO:
-# refactor player - P1 looks to the wrong side
-# look in different directions
-# shot in different directions
 # draw sword slice
+# hit with sword
