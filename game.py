@@ -285,7 +285,7 @@ class StaticPlayerPainter:
                   0,
                   self.player_rect.x, self.player_rect.y, 
                   self.player_rect.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.player_rect.w,
-                  self.player_rect.y)
+                  self.player_rect.h)
 
 class Player:
     def __init__(self, x, y, name) -> None:
