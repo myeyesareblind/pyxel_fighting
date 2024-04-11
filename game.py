@@ -97,12 +97,12 @@ class GameScene:
         p2_mover = Mover(p2, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT)
         self.movers.append(p2_mover)
 
-        p1_painter = StaticPlayerPainter(p1, p1_mover, Rect(0,0,14,16))
+        p1_painter = StaticPlayerPainter(p1, p1_mover, Rect(0,0,13,16))
         p2_painter = StaticPlayerPainter(p2, p2_mover, Rect(0,16,16,16))
         p1_sword_painter = SwordPainter(p1, p1_mover, p1_sword, Point(13, 13), Rect(13, 2, 3, 14), Point(0, 11), Rect(29,11, 15, 5), Point(0, 3))
         self.painters.append(p1_painter)
-        #self.painters.append(p2_painter)
-        #self.painters.append(p1_sword_painter)
+        self.painters.append(p2_painter)
+        self.painters.append(p1_sword_painter)
 
         # self.shot_producers.append(ShotProducer(p1, p1_mover, pyxel.KEY_1))
         self.shot_producers.append(ShotProducer(p2, p2_mover, pyxel.KEY_RETURN))
@@ -270,7 +270,7 @@ class SwordPainter:
                           0,
                           self.sword_rect_normal.x, self.sword_rect_normal.y, 
                           self.sword_rect_normal.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.sword_rect_normal.w,
-                          self.sword_rect_normal.y)
+                          self.sword_rect_normal.h)
             case SwordState.HITTING:
                 pass
 
