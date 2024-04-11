@@ -27,6 +27,9 @@ class Rect:
             self.x += x
         if y is not None:
             self.y += y
+    
+    def __str__(self) -> str:
+        return "[{}-{},{}x{}]".format(self.x,self.y,self.w,self.h)
 
 VIEWPORT = Rect(0, 0, SIZE, SIZE)
 
@@ -83,11 +86,9 @@ class GameScene:
         self.painters = []
         self.sword_systems = []
 
-        p1 = Player(0, 0, 
-                    "Kiril")
+        p1 = Player(0, 0, 13, PLAYER_SIZE, "Kiril")
 
-        p2 = Player(SIZE - PLAYER_SIZE, 0, 
-                    "Max")
+        p2 = Player(SIZE - PLAYER_SIZE, 0, PLAYER_SIZE, PLAYER_SIZE, "Max")
 
         self.players.append(p1)
         self.players.append(p2)
@@ -126,6 +127,8 @@ class GameScene:
                 return EndScene(self.players[0])
         
         self.bullets = [b for b in self.bullets if VIEWPORT.contains(b.bounds())]
+        for s in self.sword_systems:
+            s.update()
 
         return self
     
@@ -248,10 +251,9 @@ class Mover:
             self.player.y = rect.y
 
 class SwordPainter:
-    def __init__( \
-            self, player, mover, sword_system, \
-            player_sword_joint_point, \
-            sword_rect_normal, sword_joint_norlam_point, \
+    def __init__(self, player, mover, sword_system,
+            player_sword_joint_point,
+            sword_rect_normal, sword_joint_norlam_point,
             sword_rect_hit, sword_joint_hit_point) -> None:
         self.player = player
         self.mover = mover
@@ -265,15 +267,50 @@ class SwordPainter:
     def draw(self):
         match self.sword_system.state:
             case SwordState.NONE:
-                offset_right = 0 if self.mover.horizontal_direction == HorizontalDirection.RIGHT else self.player.bounds().w
-                pyxel.blt(self.player.x + self.player_sword_joint_point.x - self.sword_joint_norlam_point.x - offset_right, 
-                          self.player.y + self.player_sword_joint_point.y - self.sword_joint_norlam_point.y,
-                          0,
-                          self.sword_rect_normal.x, self.sword_rect_normal.y, 
-                          self.sword_rect_normal.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.sword_rect_normal.w,
-                          self.sword_rect_normal.h)
+                self.draw_normal_sword()
             case SwordState.HITTING:
-                pass
+                pyxel.dither(0.5)
+                if self.sword_system.hit_frame % 2 == 0:
+                    self.draw_hit_sword()
+                    self.draw_normal_sword()
+                else:
+                    self.draw_normal_sword()
+                    self.draw_hit_sword()
+        pyxel.dither(1)
+    
+    def right_offset(self):
+        return 0 if self.mover.horizontal_direction == HorizontalDirection.RIGHT else self.player.bounds().w
+
+    def draw_normal_sword(self):
+        sword_offset = \
+        0 if self.mover.horizontal_direction == HorizontalDirection.RIGHT \
+        else self.sword_rect_normal.w - self.sword_joint_norlam_point.x
+        
+        x = self.player.x\
+        + self.player_sword_joint_point.x - self.right_offset()\
+        - self.sword_joint_norlam_point.x - sword_offset
+
+        pyxel.blt(x,
+                self.player.y + self.player_sword_joint_point.y - self.sword_joint_norlam_point.y,
+                0,
+                self.sword_rect_normal.x, self.sword_rect_normal.y, 
+                self.sword_rect_normal.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.sword_rect_normal.w,
+                self.sword_rect_normal.h)
+    
+    def draw_hit_sword(self):
+        sword_offset = \
+        0 if self.mover.horizontal_direction == HorizontalDirection.RIGHT \
+        else self.sword_rect_hit.w - self.sword_joint_hit_point.x
+
+        pyxel.blt(self.player.x 
+                  + self.player_sword_joint_point.x - self.right_offset()
+                  - self.sword_joint_hit_point.x  - sword_offset, 
+                self.player.y + self.player_sword_joint_point.y - self.sword_joint_hit_point.y,
+                0,
+                self.sword_rect_hit.x, self.sword_rect_hit.y, 
+                self.sword_rect_hit.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.sword_rect_hit.w,
+                self.sword_rect_hit.h)
+
 
 class StaticPlayerPainter:
     def __init__(self, player, mover, player_rect) -> None:
@@ -289,13 +326,15 @@ class StaticPlayerPainter:
                   self.player_rect.h)
 
 class Player:
-    def __init__(self, x, y, name) -> None:
+    def __init__(self, x, y, w, h, name) -> None:
         self.x = x
         self.y = y
+        self.w = w
+        self.h = h
         self.name = name
     
     def bounds(self):
-        return Rect(self.x, self.y, PLAYER_SIZE, PLAYER_SIZE)
+        return Rect(self.x, self.y, self.w, self.h)
 
 class App:
     def __init__(self):
@@ -313,7 +352,6 @@ class App:
         self.scene_router.draw()
 
 App()
-
 # TODO:
 # draw sword slice
 # hit with sword
