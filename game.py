@@ -265,7 +265,8 @@ class SwordPainter:
     def draw(self):
         match self.sword_system.state:
             case SwordState.NONE:
-                pyxel.blt(self.player.x + self.player_sword_joint_point.x - self.sword_joint_norlam_point.x, 
+                offset_right = 0 if self.mover.horizontal_direction == HorizontalDirection.RIGHT else self.player.bounds().w
+                pyxel.blt(self.player.x + self.player_sword_joint_point.x - self.sword_joint_norlam_point.x - offset_right, 
                           self.player.y + self.player_sword_joint_point.y - self.sword_joint_norlam_point.y,
                           0,
                           self.sword_rect_normal.x, self.sword_rect_normal.y, 
