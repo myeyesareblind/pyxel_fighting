@@ -4,6 +4,11 @@ from enum import Enum
 SIZE = 256
 PLAYER_SIZE = 16
 
+class Point:
+    def __init__(self, x, y) -> None:
+        self.x = x
+        self.y = y
+
 class Rect:
     def __init__(self, x, y, w, h) -> None:
         self.x = x
@@ -30,6 +35,10 @@ class Direction(Enum):
     RIGHT = 2
     TOP = 3
     BOTTOM = 4
+
+class SwordState(Enum):
+    NONE = 1
+    HITTING = 2
 
 class HorizontalDirection(Enum):
     LEFT = 1
@@ -71,7 +80,8 @@ class GameScene:
         self.bullets = []
         self.shot_producers = []
         self.movers = []
-        self.player_painters = []
+        self.painters = []
+        self.sword_systems = []
 
         p1 = Player(0, 0, 
                     "Kiril")
@@ -82,17 +92,22 @@ class GameScene:
         self.players.append(p1)
         self.players.append(p2)
         p1_mover = Mover(p1, pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S, HorizontalDirection.RIGHT)
+        p1_sword = SwordSystem(p1, p1_mover, pyxel.KEY_1)
         self.movers.append(p1_mover)
         p2_mover = Mover(p2, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT)
         self.movers.append(p2_mover)
 
-        p1_painter = PlayerPainter(p1, p1_mover, 0, 0)
-        p2_painter = PlayerPainter(p2, p2_mover, 0, PLAYER_SIZE)
-        self.player_painters.append(p1_painter)
-        self.player_painters.append(p2_painter)
+        p1_painter = StaticPlayerPainter(p1, p1_mover, Rect(0,0,14,16))
+        p2_painter = StaticPlayerPainter(p2, p2_mover, Rect(0,16,16,16))
+        p1_sword_painter = SwordPainter(p1, p1_mover, p1_sword, Point(13, 13), Rect(13, 2, 3, 14), Point(0, 11), Rect(29,11, 15, 5), Point(0, 3))
+        self.painters.append(p1_painter)
+        #self.painters.append(p2_painter)
+        #self.painters.append(p1_sword_painter)
 
-        self.shot_producers.append(ShotProducer(p1, p1_mover, pyxel.KEY_1))
+        # self.shot_producers.append(ShotProducer(p1, p1_mover, pyxel.KEY_1))
         self.shot_producers.append(ShotProducer(p2, p2_mover, pyxel.KEY_RETURN))
+
+        self.sword_systems.append(p1_sword)
 
     def update(self):
         for shot_producer in self.shot_producers:
@@ -112,20 +127,37 @@ class GameScene:
         
         self.bullets = [b for b in self.bullets if VIEWPORT.contains(b.bounds())]
 
-        for p in self.players:
-            p.update()
-
         return self
     
     def draw(self):
         for b in self.bullets:
             b.draw()
 
-        for p in self.players:
-            p.draw()
+        for painter in self.painters:
+            painter.draw()
 
-        for player_painter in self.player_painters:
-            player_painter.draw()
+class SwordSystem:
+    def __init__(self, player, mover, key) -> None:
+        self.player = player
+        self.mover = mover
+        self.key = key
+        self.state = SwordState.NONE
+        self.delay = 20
+        self.last = -1000000
+        self.length = 10
+        self.hit_frame = 0
+    
+    def update(self):
+        match self.state:
+            case SwordState.NONE:
+                if pyxel.btn(self.key) and pyxel.frame_count - self.last > self.delay:
+                    self.state = SwordState.HITTING
+                    self.hit_frame = 0
+            case SwordState.HITTING:
+                self.hit_frame += 1
+                if self.hit_frame >= self.length:
+                    self.state = SwordState.NONE
+                    self.last = pyxel.frame_count
 
 class Bullet:
     def __init__(self, player, direction) -> None:
@@ -215,19 +247,45 @@ class Mover:
             self.player.x = rect.x
             self.player.y = rect.y
 
-class PlayerPainter:
-    def __init__(self, player, mover, x, y) -> None:
-        self.x = x
-        self.y = y
+class SwordPainter:
+    def __init__( \
+            self, player, mover, sword_system, \
+            player_sword_joint_point, \
+            sword_rect_normal, sword_joint_norlam_point, \
+            sword_rect_hit, sword_joint_hit_point) -> None:
         self.player = player
         self.mover = mover
+        self.sword_system = sword_system
+        self.player_sword_joint_point = player_sword_joint_point
+        self.sword_rect_normal = sword_rect_normal
+        self.sword_joint_norlam_point = sword_joint_norlam_point
+        self.sword_rect_hit = sword_rect_hit
+        self.sword_joint_hit_point = sword_joint_hit_point
+    
+    def draw(self):
+        match self.sword_system.state:
+            case SwordState.NONE:
+                pyxel.blt(self.player.x + self.player_sword_joint_point.x - self.sword_joint_norlam_point.x, 
+                          self.player.y + self.player_sword_joint_point.y - self.sword_joint_norlam_point.y,
+                          0,
+                          self.sword_rect_normal.x, self.sword_rect_normal.y, 
+                          self.sword_rect_normal.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.sword_rect_normal.w,
+                          self.sword_rect_normal.y)
+            case SwordState.HITTING:
+                pass
+
+class StaticPlayerPainter:
+    def __init__(self, player, mover, player_rect) -> None:
+        self.player = player
+        self.mover = mover
+        self.player_rect = player_rect
     
     def draw(self):
         pyxel.blt(self.player.x, self.player.y, 
                   0,
-                  self.x, self.y, 
-                  PLAYER_SIZE if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -PLAYER_SIZE,
-                  PLAYER_SIZE)
+                  self.player_rect.x, self.player_rect.y, 
+                  self.player_rect.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.player_rect.w,
+                  self.player_rect.y)
 
 class Player:
     def __init__(self, x, y, name) -> None:
@@ -237,12 +295,6 @@ class Player:
     
     def bounds(self):
         return Rect(self.x, self.y, PLAYER_SIZE, PLAYER_SIZE)
-    
-    def update(self):
-        pass
-    
-    def draw(self):
-        pass
 
 class App:
     def __init__(self):
