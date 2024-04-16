@@ -21,6 +21,20 @@ class Rect:
             and self.y <= other.y \
             and self.w + self.x >= other.x + other.w \
             and self.y + self.h >= other.y + other.h
+
+    def intersects(self, other):
+        return Rect.one_dimension_intersects([self.x, self.w], [other.x, other.w]) and\
+        Rect.one_dimension_intersects([self.y, self.h], [other.y, other.h])
+
+    @staticmethod
+    def one_dimension_intersects(x1, x2):
+        left = x1
+        right = x2
+        if right[0] < left[0]:
+            t = left
+            left = right
+            right = t
+        return (left[0] + left[1]) >= right[0]
     
     def move(self, x = None, y = None):
         if x is not None:
@@ -93,7 +107,6 @@ class GameScene:
         self.players.append(p1)
         self.players.append(p2)
         p1_mover = Mover(p1, pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S, HorizontalDirection.RIGHT)
-        p1_sword = SwordSystem(p1, p1_mover, pyxel.KEY_1)
         self.movers.append(p1_mover)
         p2_mover = Mover(p2, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT)
         self.movers.append(p2_mover)
@@ -101,6 +114,7 @@ class GameScene:
         p1_painter = StaticPlayerPainter(p1, p1_mover, Rect(0,0,13,16))
         p2_painter = StaticPlayerPainter(p2, p2_mover, Rect(0,16,16,16))
         p1_sword_frame_calc = SwordFrameCalculator(p1, p1_mover, Point(13, 13), Rect(13, 2, 3, 14), Point(0, 11), Rect(29,11, 15, 5), Point(0, 3))
+        p1_sword = SwordSystem(p1, p1_mover, p1_sword_frame_calc, pyxel.KEY_1)
         p1_sword_painter = SwordPainter(p1, p1_mover, p1_sword, p1_sword_frame_calc, Rect(13, 2, 3, 14), Rect(29,11, 15, 5))
         self.painters.append(p1_painter)
         self.painters.append(p2_painter)
@@ -128,8 +142,10 @@ class GameScene:
                 return EndScene(self.players[0])
         
         self.bullets = [b for b in self.bullets if VIEWPORT.contains(b.bounds())]
+
         for s in self.sword_systems:
             s.update()
+            self.bullets = [b for b in self.bullets if not s.hits(b.bounds())]
 
         return self
     
@@ -141,9 +157,10 @@ class GameScene:
             painter.draw()
 
 class SwordSystem:
-    def __init__(self, player, mover, key) -> None:
+    def __init__(self, player, mover, frame_calculator, key) -> None:
         self.player = player
         self.mover = mover
+        self.frame_calculator = frame_calculator
         self.key = key
         self.state = SwordState.NONE
         self.delay = 20
@@ -162,6 +179,21 @@ class SwordSystem:
                 if self.hit_frame >= self.length:
                     self.state = SwordState.NONE
                     self.last = pyxel.frame_count
+    
+    def hits(self, frame):
+        match self.state:
+            case SwordState.NONE:
+                return False
+            case SwordState.HITTING:
+                start = self.frame_calculator.getNormalFrame()
+                end = self.frame_calculator.getHitFrame()
+                sword_rect = Rect(
+                    min(start.x, end.x),
+                    min(start.y, end.y),
+                    max(start.w, end.w),
+                    max(start.h, end.h)
+                )
+                return sword_rect.intersects(frame)
 
 class Bullet:
     def __init__(self, player, direction) -> None:
@@ -277,6 +309,9 @@ class SwordFrameCalculator:
         - self.sword_joint_norlam_point.x - sword_offset
         return x
     
+    def getNormalFrame(self):
+        return Rect(self.getNormalX(), self.getNormalY(), self.sword_rect_normal.w, self.sword_rect_normal.h)
+    
     def getNormalY(self):
         return self.player.y + self.player_sword_joint_point.y - self.sword_joint_norlam_point.y
     
@@ -292,6 +327,8 @@ class SwordFrameCalculator:
     def getHitY(self):
         return self.player.y + self.player_sword_joint_point.y - self.sword_joint_hit_point.y
 
+    def getHitFrame(self):
+        return Rect(self.getHitX(), self.getHitY(), self.sword_rect_hit.w, self.sword_rect_hit.h)
 
 class SwordPainter:
     def __init__(self, player, mover, sword_system,
