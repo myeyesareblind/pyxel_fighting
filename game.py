@@ -146,6 +146,12 @@ class GameScene:
         for s in self.sword_systems:
             s.update()
             self.bullets = [b for b in self.bullets if not s.hits(b.bounds())]
+            for p in self.players:
+                if p == s.player:
+                    continue
+                if s.hits(p.bounds()):
+                    self.players.remove(p)
+                    return EndScene(self.players[0])
 
         return self
     
@@ -416,8 +422,6 @@ class App:
 
 App()
 # TODO:
-# extract collision for sword
 # collision for sword <> person
-# collision for sword <> bullet
 # invis
 # trees
