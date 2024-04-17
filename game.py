@@ -99,6 +99,7 @@ class GameScene:
         self.movers = []
         self.painters = []
         self.sword_systems = []
+        self.invis_systems = []
 
         p1 = Player(0, 0, 13, PLAYER_SIZE, "Kiril")
 
@@ -116,6 +117,8 @@ class GameScene:
         p1_sword_frame_calc = SwordFrameCalculator(p1, p1_mover, Point(13, 13), Rect(13, 2, 3, 14), Point(0, 11), Rect(29,11, 15, 5), Point(0, 3))
         p1_sword = SwordSystem(p1, p1_mover, p1_sword_frame_calc, pyxel.KEY_1)
         p1_sword_painter = SwordPainter(p1, p1_mover, p1_sword, p1_sword_frame_calc, Rect(13, 2, 3, 14), Rect(29,11, 15, 5))
+        p1_invis = InvisSystem(p1, pyxel.KEY_2)
+        self.invis_systems.append(p1_invis)
         self.painters.append(p1_painter)
         self.painters.append(p2_painter)
         self.painters.append(p1_sword_painter)
@@ -133,6 +136,9 @@ class GameScene:
 
         for mover in self.movers:
             mover.update()
+        
+        for i in self.invis_systems:
+            i.update()
 
         for b in self.bullets:
             b.update()
@@ -161,6 +167,31 @@ class GameScene:
 
         for painter in self.painters:
             painter.draw()
+class InvisState(Enum):
+    NONE = 1
+    INVIS = 2
+class InvisSystem:
+    def __init__(self, player, key) -> None:
+        self.player = player
+        self.key = key
+        self.state = InvisState.NONE
+        self.delay = 30
+        self.last = -1000000
+        self.length = 20
+
+    def update(self):
+        match self.state:
+            case InvisState.NONE:
+                self.player.hidden = False
+                if pyxel.btn(self.key) and pyxel.frame_count - self.last > self.delay:
+                    self.state = InvisState.INVIS
+                    self.start_frame = 0
+            case InvisState.INVIS:
+                self.player.hidden = True
+                self.start_frame += 1
+                if self.start_frame >= self.length:
+                    self.state = InvisState.NONE
+                    self.last = pyxel.frame_count
 
 class SwordSystem:
     def __init__(self, player, mover, frame_calculator, key) -> None:
@@ -169,9 +200,9 @@ class SwordSystem:
         self.frame_calculator = frame_calculator
         self.key = key
         self.state = SwordState.NONE
-        self.delay = 20
+        self.delay = 30
         self.last = -1000000
-        self.length = 10
+        self.length = 15
         self.hit_frame = 0
     
     def update(self):
@@ -349,18 +380,19 @@ class SwordPainter:
         self.sword_rect_hit = sword_rect_hit
     
     def draw(self):
-        match self.sword_system.state:
-            case SwordState.NONE:
-                self.draw_normal_sword()
-            case SwordState.HITTING:
-                pyxel.dither(0.5)
-                if self.sword_system.hit_frame % 2 == 0:
-                    self.draw_hit_sword()
+        if not self.player.hidden:
+            match self.sword_system.state:
+                case SwordState.NONE:
                     self.draw_normal_sword()
-                else:
-                    self.draw_normal_sword()
-                    self.draw_hit_sword()
-        pyxel.dither(1)
+                case SwordState.HITTING:
+                    pyxel.dither(0.5)
+                    if self.sword_system.hit_frame % 2 == 0:
+                        self.draw_hit_sword()
+                        self.draw_normal_sword()
+                    else:
+                        self.draw_normal_sword()
+                        self.draw_hit_sword()
+            pyxel.dither(1)
     
     def draw_normal_sword(self):
         pyxel.blt(
@@ -388,11 +420,12 @@ class StaticPlayerPainter:
         self.player_rect = player_rect
     
     def draw(self):
-        pyxel.blt(self.player.x, self.player.y, 
-                  0,
-                  self.player_rect.x, self.player_rect.y, 
-                  self.player_rect.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.player_rect.w,
-                  self.player_rect.h)
+        if not self.player.hidden:
+            pyxel.blt(self.player.x, self.player.y, 
+                    0,
+                    self.player_rect.x, self.player_rect.y, 
+                    self.player_rect.w if self.mover.horizontal_direction == HorizontalDirection.RIGHT else -self.player_rect.w,
+                    self.player_rect.h)
 
 class Player:
     def __init__(self, x, y, w, h, name) -> None:
@@ -401,6 +434,7 @@ class Player:
         self.w = w
         self.h = h
         self.name = name
+        self.hidden = False
     
     def bounds(self):
         return Rect(self.x, self.y, self.w, self.h)
@@ -422,6 +456,5 @@ class App:
 
 App()
 # TODO:
-# collision for sword <> person
 # invis
 # trees
