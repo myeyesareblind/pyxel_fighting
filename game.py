@@ -101,30 +101,30 @@ class GameScene:
         self.sword_systems = []
         self.invis_systems = []
 
-        p1 = Player(0, 0, 13, PLAYER_SIZE, "Kiril")
+        p1 = Player(SIZE - PLAYER_SIZE, 0, 13, PLAYER_SIZE, "Kiril")
 
-        p2 = Player(SIZE - PLAYER_SIZE, 0, PLAYER_SIZE, PLAYER_SIZE, "Max")
+        p2 = Player(0, 0, PLAYER_SIZE, PLAYER_SIZE, "Max")
 
         self.players.append(p1)
         self.players.append(p2)
-        p1_mover = Mover(p1, pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S, HorizontalDirection.RIGHT)
+        p1_mover = Mover(p1, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT)
         self.movers.append(p1_mover)
-        p2_mover = Mover(p2, pyxel.KEY_LEFT, pyxel.KEY_RIGHT, pyxel.KEY_UP, pyxel.KEY_DOWN, HorizontalDirection.LEFT)
+        p2_mover = Mover(p2, pyxel.KEY_A, pyxel.KEY_D, pyxel.KEY_W, pyxel.KEY_S, HorizontalDirection.RIGHT)
         self.movers.append(p2_mover)
 
         p1_painter = StaticPlayerPainter(p1, p1_mover, Rect(0,0,13,16))
         p2_painter = StaticPlayerPainter(p2, p2_mover, Rect(0,16,16,16))
         p1_sword_frame_calc = SwordFrameCalculator(p1, p1_mover, Point(13, 13), Rect(13, 2, 3, 14), Point(0, 11), Rect(29,11, 15, 5), Point(0, 3))
-        p1_sword = SwordSystem(p1, p1_mover, p1_sword_frame_calc, pyxel.KEY_1)
+        p1_sword = SwordSystem(p1, p1_mover, p1_sword_frame_calc, pyxel.KEY_L)
         p1_sword_painter = SwordPainter(p1, p1_mover, p1_sword, p1_sword_frame_calc, Rect(13, 2, 3, 14), Rect(29,11, 15, 5))
-        p1_invis = InvisSystem(p1, pyxel.KEY_2)
+        p1_invis = InvisSystem(p1, pyxel.KEY_K)
         self.invis_systems.append(p1_invis)
         self.painters.append(p1_painter)
         self.painters.append(p2_painter)
         self.painters.append(p1_sword_painter)
 
         # self.shot_producers.append(ShotProducer(p1, p1_mover, pyxel.KEY_1))
-        self.shot_producers.append(ShotProducer(p2, p2_mover, pyxel.KEY_RETURN))
+        self.shot_producers.append(ShotProducer(p2, p2_mover, pyxel.KEY_1))
 
         self.sword_systems.append(p1_sword)
 
